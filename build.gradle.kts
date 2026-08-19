@@ -16,8 +16,9 @@ plugins {
     id("maven-publish")
 }
 
-group = "moe.alex3236"
-version = "0.1.0-SNAPSHOT"
+// Keep the package coordinates stable for local and GitHub Packages publication.
+group = providers.gradleProperty("group").orElse("com.github.YumeYucca").get()
+version = providers.gradleProperty("version").orElse("1.0.0-SNAPSHOT").get()
 
 kotlin {
     androidTarget()
@@ -76,7 +77,10 @@ buildscript {
         maven("https://jcenter.bintray.com")
     }
     dependencies {
-        classpath("com.github.DevSrSouza:svg-to-compose:-SNAPSHOT")
+        // Use the published JitPack release. The old -SNAPSHOT coordinate
+        // expands to an invalid artifact name and prevents JitPack from
+        // configuring the project before publication.
+        classpath("com.github.DevSrSouza:svg-to-compose:0.11.0")
         classpath("com.google.guava:guava:23.0")
         classpath("com.android.tools:sdk-common:31.2.1")
         classpath("com.android.tools:common:31.2.1")
@@ -140,9 +144,24 @@ tasks.matching { it.name.lowercase().endsWith("sourcesjar") }.configureEach {
 
 publishing {
     publications {
+        // Kotlin Multiplatform creates the platform publications after the
+        // targets are configured. Apply the project coordinates to every one.
+        withType<MavenPublication> {
+            groupId = project.group.toString()
+            version = project.version.toString()
+        }
     }
 
     repositories {
         mavenLocal()
+
+        maven {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/YumeYucca/lucide-compose")
+            credentials {
+                username = providers.environmentVariable("GITHUB_ACTOR").orNull
+                password = providers.environmentVariable("GITHUB_TOKEN").orNull
+            }
+        }
     }
 }

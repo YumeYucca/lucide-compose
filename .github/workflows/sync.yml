@@ -1,0 +1,66 @@
+name: Sync Lucide upstream
+
+on:
+  schedule:
+    # Check the upstream Lucide repository every 12 hours.
+    - cron: "0 */12 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out Moe branch and submodule
+        uses: actions/checkout@v4
+        with:
+          ref: Moe
+          submodules: recursive
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Find latest upstream tag
+        id: upstream
+        shell: bash
+        run: |
+          cd lucide
+          git remote set-url origin https://github.com/lucide-icons/lucide.git
+          git fetch --tags origin
+
+          current_commit="$(git rev-parse HEAD)"
+          latest_tag="$(git tag --sort=-version:refname | head -n 1)"
+          latest_commit="$(git rev-list -n 1 "$latest_tag")"
+
+          echo "Current commit: $current_commit"
+          echo "Latest tag: $latest_tag"
+          echo "Latest commit: $latest_commit"
+
+          if [ "$current_commit" = "$latest_commit" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "tag=$latest_tag" >> "$GITHUB_OUTPUT"
+
+      - name: Update submodule
+        if: steps.upstream.outputs.changed == 'true'
+        run: |
+          git -C lucide checkout --quiet "${{ steps.upstream.outputs.tag }}"
+          git add lucide
+          git commit -m "chore: update lucide submodule to ${{ steps.upstream.outputs.tag }}"
+
+      - name: Push update and release tag
+        if: steps.upstream.outputs.changed == 'true'
+        run: |
+          release_tag="${{ steps.upstream.outputs.tag }}"
+          git tag -a "$release_tag" -m "Update to lucide $release_tag"
+          git push origin Moe
+          git push origin "$release_tag"
