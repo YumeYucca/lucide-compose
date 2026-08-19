@@ -1,9 +1,6 @@
-@file:OptIn(ExperimentalWasmDsl::class)
-
 import br.com.devsrsouza.svg2compose.IconNameTransformer
 import br.com.devsrsouza.svg2compose.Svg2Compose
 import br.com.devsrsouza.svg2compose.VectorType
-import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import java.util.*
 import LucideMetadataGenerator.generate as generateMetadata
 
@@ -17,28 +14,13 @@ plugins {
 }
 
 // Keep the package coordinates stable for local and GitHub Packages publication.
-group = providers.gradleProperty("group").orElse("com.github.YumeYucca").get()
+group = providers.gradleProperty("group").orElse("io.github.YumeYucca").get()
 version = providers.gradleProperty("version").orElse("1.0.0-SNAPSHOT").get()
 
 kotlin {
     androidTarget()
     jvm("desktop")
-    js(IR) {
-        browser()
-        nodejs()
-    }
     applyDefaultHierarchyTemplate()
-    macosX64()
-    macosArm64()
-    iosX64()
-    iosArm64()
-    iosSimulatorArm64()
-//    linuxX64()
-
-    wasmJs {
-        browser()
-    }
-
 
     sourceSets {
         val commonMain by getting {
@@ -57,7 +39,7 @@ kotlin {
 
 android {
     namespace = "moe.alex3236.compose.lucide"
-    compileSdk = 35
+    compileSdk = 36
     defaultConfig {
         minSdk = 21
     }
@@ -77,15 +59,14 @@ buildscript {
         maven("https://jcenter.bintray.com")
     }
     dependencies {
-        // Use the published JitPack release. The old -SNAPSHOT coordinate
-        // expands to an invalid artifact name and prevents JitPack from
-        // configuring the project before publication.
-        classpath("com.github.DevSrSouza:svg-to-compose:0.11.0")
-        classpath("com.google.guava:guava:23.0")
-        classpath("com.android.tools:sdk-common:31.2.1")
-        classpath("com.android.tools:common:31.2.1")
-        classpath("com.squareup:kotlinpoet:1.14.2")
-        classpath("org.ogce:xpp3:1.1.6")
+        // The generator is published separately and is only needed while
+        // producing the Compose ImageVector sources.
+        classpath(libs.svg.to.compose)
+        classpath(libs.guava)
+        classpath(libs.sdk.common)
+        classpath(libs.common)
+        classpath(libs.kotlinpoet)
+        classpath(libs.xpp3)
     }
 }
 
