@@ -35,7 +35,7 @@ jobs:
           git fetch --tags origin
 
           current_commit="$(git rev-parse HEAD)"
-          latest_tag="$(git tag --sort=-version:refname | head -n 1)"
+          latest_tag="$(git for-each-ref --sort=-version:refname --count=1 --format='%(refname:strip=2)' refs/tags)"
           latest_commit="$(git rev-list -n 1 "$latest_tag")"
 
           echo "Current commit: $current_commit"
