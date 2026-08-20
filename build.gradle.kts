@@ -1,6 +1,7 @@
 @file:OptIn(ExperimentalWasmDsl::class)
 
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
+import org.gradle.api.publish.maven.MavenPublication
 import LucideMetadataGenerator.generate as generateMetadata
 
 
@@ -118,9 +119,38 @@ tasks.matching { it.name.lowercase().endsWith("sourcesjar") }.configureEach {
 
 publishing {
     publications {
+        withType<MavenPublication> {
+            groupId = project.group.toString()
+            version = project.version.toString()
+            pom {
+                name.set("Lucide Compose")
+                description.set("Lucide icons for Kotlin Multiplatform Compose.")
+                url.set("https://github.com/YumeYucca/lucide-compose")
+                licenses {
+                    license {
+                        name.set("ISC License")
+                        url.set("https://github.com/YumeYucca/lucide-compose/blob/Moe/LICENSE")
+                    }
+                }
+                scm {
+                    url.set("https://github.com/YumeYucca/lucide-compose")
+                    connection.set("scm:git:https://github.com/YumeYucca/lucide-compose.git")
+                    developerConnection.set("scm:git:ssh://git@github.com/YumeYucca/lucide-compose.git")
+                }
+            }
+        }
     }
 
     repositories {
         mavenLocal()
+
+        maven {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/YumeYucca/lucide-compose")
+            credentials {
+                username = providers.environmentVariable("GITHUB_ACTOR").orNull
+                password = providers.environmentVariable("GITHUB_TOKEN").orNull
+            }
+        }
     }
 }
