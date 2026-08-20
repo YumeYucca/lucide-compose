@@ -14,13 +14,13 @@ plugins {
     id("maven-publish")
 }
 
-group = "moe.alex3236"
-version = "0.1.0-SNAPSHOT"
+group = "io.github.YumeYucca"
+version = "1.0.0-SNAPSHOT"
 
 kotlin {
     android {
-        namespace = "moe.alex3236.compose.lucide"
-        compileSdk = 35
+        namespace = "io.github.yumeyucca.lucide"
+        compileSdk = 36
         minSdk = 21
     }
     jvm("desktop")
@@ -59,7 +59,7 @@ repositories {
     gradlePluginPortal()
 }
 
-val lucidePackage = "moe.alex3236.compose.lucide"
+val lucidePackage = "io.github.yumeyucca.lucide"
 val valkyrieCommonMainOutput = layout.buildDirectory.dir("generated/sources/valkyrie/commonMain/kotlin")
 
 valkyrie {

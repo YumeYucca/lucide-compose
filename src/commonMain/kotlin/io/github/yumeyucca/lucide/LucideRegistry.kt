@@ -1,4 +1,4 @@
-package moe.alex3236.compose.lucide
+package io.github.yumeyucca.lucide
 
 import androidx.compose.ui.graphics.vector.ImageVector
 
