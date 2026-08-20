@@ -6,7 +6,7 @@ import LucideMetadataGenerator.generate as generateMetadata
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
-    alias(libs.plugins.androidApplication)
+    alias(libs.plugins.androidKotlinMultiplatformLibrary)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.valkyrie)
@@ -17,16 +17,18 @@ group = "moe.alex3236"
 version = "0.1.0-SNAPSHOT"
 
 kotlin {
-    androidTarget()
+    android {
+        namespace = "moe.alex3236.compose.lucide"
+        compileSdk = 35
+        minSdk = 21
+    }
     jvm("desktop")
     js(IR) {
         browser()
         nodejs()
     }
     applyDefaultHierarchyTemplate()
-    macosX64()
     macosArm64()
-    iosX64()
     iosArm64()
     iosSimulatorArm64()
 //    linuxX64()
@@ -47,14 +49,6 @@ kotlin {
                 api(compose.ui)
             }
         }
-    }
-}
-
-android {
-    namespace = "moe.alex3236.compose.lucide"
-    compileSdk = 35
-    defaultConfig {
-        minSdk = 21
     }
 }
 
