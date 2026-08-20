@@ -5,9 +5,15 @@ import java.io.File
 object LucideMetadataGenerator {
 
     fun iconNameToKotlinName(iconName: String): String =
-        iconName.split("-").joinToString("") { part ->
-            part.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
-        }
+        iconName
+            .trimStart('-', '_')
+            .removePrefix("ic_")
+            .removePrefix("ic-")
+            .replace(Regex("[^a-zA-Z0-9\\-_ ]"), "_")
+            .split(Regex("(?<!^)(?=[A-Z])|(?<=\\D)(?=\\d)|(?<=\\d)(?=\\D)"))
+            .joinToString("") { it.replaceFirstChar(Char::uppercase) }
+            .split("_", " ", "-")
+            .joinToString("") { it.replaceFirstChar(Char::uppercase) }
 
     fun generate(
         assetsDir: File,
@@ -18,13 +24,12 @@ object LucideMetadataGenerator {
         require(assetsDir.isDirectory) { "assetsDir must be a directory: $assetsDir" }
         val packageDir = basePackage.replace('.', '/')
         val outputDir = File(srcDir, packageDir).apply { mkdirs() }
-        // remove all files ends with .generated.kt in the target directory
         outputDir.listFiles { file ->
             file.isFile && file.name.endsWith(".generated.kt")
         }?.forEach { it.delete() }
 
-        // 先把所有 entry 收集成字符串列表
         val entries = mutableListOf<String>()
+        val iconNames = mutableListOf<String>()
 
         assetsDir.walkTopDown()
             .filter { it.isFile && it.extension == "json" }
@@ -53,10 +58,14 @@ object LucideMetadataGenerator {
                 entries += entry
             }
 
-        // 1. 先写总的 IconMetadata 声明和 LucideMetadata 声明
-        writeMainMetadataFile(basePackage, outputDir, entries.size, chunkSize)
+        assetsDir.walkTopDown()
+            .filter { it.isFile && it.extension == "svg" }
+            .sortedBy { it.relativeTo(assetsDir).path }
+            .forEach { svgFile ->
+                iconNames += iconNameToKotlinName(svgFile.nameWithoutExtension)
+            }
 
-        // 2. 再写多个 chunk 文件
+        writeMainMetadataFile(basePackage, outputDir, entries.size, chunkSize, iconNames)
         writeChunkFiles(basePackage, outputDir, entries, chunkSize)
     }
 
@@ -65,6 +74,7 @@ object LucideMetadataGenerator {
         outputDir: File,
         totalCount: Int,
         chunkSize: Int,
+        iconNames: List<String>,
     ) {
         val chunkCount = (totalCount + chunkSize - 1) / chunkSize
         val mainFile = File(outputDir, "LucideMetadata.generated.kt")
@@ -81,6 +91,12 @@ object LucideMetadataGenerator {
             |package $basePackage
             |
             |$imports
+            |
+            |import androidx.compose.ui.graphics.vector.ImageVector
+            |
+            |val Lucide.AllIcons: List<ImageVector> by lazy(LazyThreadSafetyMode.NONE) {
+            |    listOf(${iconNames.joinToString(", ") { "Lucide.$it" }})
+            |}
             |
             |internal val allMetadata: List<IconMetadata> = listOf($chunksJoin).flatten()
             |
@@ -110,7 +126,6 @@ object LucideMetadataGenerator {
                 |package $basePackage
                 |
                 |object LucideMetadataChunk$chunkIndex {
-                |    // 单个 chunk 的列表
                 |    val chunk: List<IconMetadata> = listOf($body)
                 |}
                 |

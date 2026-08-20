@@ -1,7 +1,6 @@
-package io.github.yumeyucca.lucide
+package moe.alex3236.compose.lucide
 
 import androidx.compose.ui.graphics.vector.ImageVector
-import io.github.yumeyucca.lucide.lucide.SquareSlash
 
 data class IconMetadata(
     val name: String,

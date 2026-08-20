@@ -1,56 +1,43 @@
 @file:OptIn(ExperimentalWasmDsl::class)
 
-import br.com.devsrsouza.svg2compose.IconNameTransformer
-import br.com.devsrsouza.svg2compose.Svg2Compose
-import br.com.devsrsouza.svg2compose.VectorType
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-import java.util.*
 import LucideMetadataGenerator.generate as generateMetadata
 
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
-    alias(libs.plugins.androidKotlinMultiplatformLibrary)
+    alias(libs.plugins.androidApplication)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
+    alias(libs.plugins.valkyrie)
     id("maven-publish")
 }
 
-// Publish the latest development build under one stable snapshot coordinate.
-group = "io.github.YumeYucca"
-version = "1.0.0-SNAPSHOT"
+group = "moe.alex3236"
+version = "0.1.0-SNAPSHOT"
 
 kotlin {
-    jvmToolchain(24)
-
-    android {
-        namespace = "io.github.yumeyucca.lucide"
-        compileSdk = 36
-        minSdk = 21
-    }
-
-    jvm("desktop") {
-        compilerOptions {
-            jvmTarget.set(JvmTarget.JVM_17)
-        }
-    }
-    js {
+    androidTarget()
+    jvm("desktop")
+    js(IR) {
         browser()
         nodejs()
     }
-    wasmJs {
-        browser()
-        nodejs()
-    }
+    applyDefaultHierarchyTemplate()
+    macosX64()
+    macosArm64()
+    iosX64()
     iosArm64()
     iosSimulatorArm64()
-    macosArm64()
-    applyDefaultHierarchyTemplate()
+//    linuxX64()
+
+    wasmJs {
+        browser()
+    }
+
 
     sourceSets {
-        getByName("commonMain") {
-            kotlin.srcDir(layout.buildDirectory.dir("generated/kotlin"))
+        val commonMain by getting {
             dependencies {
                 compileOnly(compose.runtime)
                 compileOnly(compose.foundation)
@@ -63,120 +50,83 @@ kotlin {
     }
 }
 
+android {
+    namespace = "moe.alex3236.compose.lucide"
+    compileSdk = 35
+    defaultConfig {
+        minSdk = 21
+    }
+}
+
 repositories {
     google()
     mavenCentral()
     gradlePluginPortal()
 }
 
-buildscript {
-    repositories {
-        mavenCentral()
-        maven("https://jitpack.io")
-        maven("https://maven.google.com")
-        maven("https://jcenter.bintray.com")
+val lucidePackage = "moe.alex3236.compose.lucide"
+val valkyrieCommonMainOutput = layout.buildDirectory.dir("generated/sources/valkyrie/commonMain/kotlin")
+
+valkyrie {
+    packageName = lucidePackage
+    // The Lucide checkout is the source of truth and remains outside src/commonMain.
+    resourceDirectoryName = "../../lucide/icons"
+    outputDirectory = layout.buildDirectory.dir("generated/sources/valkyrie")
+
+    imageVector {
+        useComposeColors = true
     }
-    dependencies {
-        // The generator is published separately and is only needed while
-        // producing the Compose ImageVector sources.
-        classpath(libs.svg.to.compose)
-        classpath(libs.guava)
-        classpath(libs.sdk.common)
-        classpath(libs.common)
-        classpath(libs.kotlinpoet)
-        classpath(libs.xpp3)
+
+    iconPack {
+        name = "Lucide"
+        targetSourceSet = "commonMain"
     }
 }
 
-val generateCompose = tasks.register("generateCompose") {
+tasks.matching {
+    it.name.startsWith("generateValkyrieImageVector") &&
+        it.name != "generateValkyrieImageVector" &&
+        it.name != "generateValkyrieImageVectorCommonMain"
+}.configureEach {
+    enabled = false
+}
+
+val generateLucideMetadata = tasks.register("generateLucideMetadata") {
     group = "generation"
-    description = "Generate Compose icons from SVG files"
+    description = "Generate Lucide metadata and the all-icons accessor"
 
     val assetsDir = file("lucide/icons")
-    val generatedSrcDir = layout.buildDirectory.dir("generated/kotlin").get().asFile
 
     inputs.dir(assetsDir)
-    outputs.dir(generatedSrcDir)
+    outputs.file(
+        valkyrieCommonMainOutput.map {
+            it.file("${lucidePackage.replace('.', '/')}/LucideMetadata.generated.kt")
+        },
+    )
+    dependsOn("generateValkyrieImageVectorCommonMain")
 
     doLast {
-        // Clean the output directory before generating
-        generatedSrcDir.deleteRecursively()
-        generatedSrcDir.mkdirs()
-
-        Svg2Compose.parse(
-            applicationIconPackage = "io.github.yumeyucca.lucide",
-            accessorName = "Lucide",
-            outputSourceDirectory = generatedSrcDir,
-            vectorsDirectory = assetsDir,
-            type = VectorType.SVG,
-            allAssetsPropertyName = "AllIcons",
-            generatePreview = false,
-            iconNameTransformer = object : IconNameTransformer {
-                override fun invoke(iconName: String, group: String): String {
-                    return iconName.split("-").joinToString("") {
-                        it.replaceFirstChar { it ->
-                            if (it.isLowerCase()) it.titlecase(
-                                Locale.getDefault()
-                            ) else it.toString()
-                        }
-                    }
-                }
-            }
-        )
-
         generateMetadata(
             assetsDir = assetsDir,
-            srcDir = generatedSrcDir,
-            basePackage = "io.github.yumeyucca.lucide",
+            srcDir = valkyrieCommonMainOutput.get().asFile,
+            basePackage = lucidePackage,
         )
     }
 }
 
-// Ensure icons are generated
 tasks.matching { it.name.contains("compile", ignoreCase = true) }.configureEach {
-    dependsOn(generateCompose)
+    dependsOn(generateLucideMetadata)
 }
 
 tasks.matching { it.name.lowercase().endsWith("sourcesjar") }.configureEach {
-    dependsOn(generateCompose)
+    dependsOn(generateLucideMetadata)
 }
 
 publishing {
     publications {
-        // Kotlin Multiplatform creates the platform publications after the
-        // targets are configured. Apply the project coordinates to every one.
-        withType<MavenPublication> {
-            groupId = project.group.toString()
-            version = project.version.toString()
-            pom {
-                name.set("Lucide Compose")
-                description.set("Lucide icons for Kotlin Multiplatform Compose.")
-                url.set("https://github.com/YumeYucca/lucide-compose")
-                licenses {
-                    license {
-                        name.set("ISC License")
-                        url.set("https://github.com/YumeYucca/lucide-compose/blob/Moe/LICENSE")
-                    }
-                }
-                scm {
-                    url.set("https://github.com/YumeYucca/lucide-compose")
-                    connection.set("scm:git:https://github.com/YumeYucca/lucide-compose.git")
-                    developerConnection.set("scm:git:ssh://git@github.com/YumeYucca/lucide-compose.git")
-                }
-            }
-        }
     }
 
     repositories {
         mavenLocal()
-
-        maven {
-            name = "GitHubPackages"
-            url = uri("https://maven.pkg.github.com/YumeYucca/lucide-compose")
-            credentials {
-                username = providers.environmentVariable("GITHUB_ACTOR").orNull
-                password = providers.environmentVariable("GITHUB_TOKEN").orNull
-            }
-        }
     }
 }
