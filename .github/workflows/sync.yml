@@ -9,6 +9,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: sync-lucide-upstream
+  cancel-in-progress: false
+
 jobs:
   sync:
     runs-on: ubuntu-latest
@@ -42,13 +46,14 @@ jobs:
           echo "Latest tag: $latest_tag"
           echo "Latest commit: $latest_commit"
 
-          if [ "$current_commit" = "$latest_commit" ]; then
+          if [ "$current_commit" = "$latest_commit" ] || git merge-base --is-ancestor "$latest_commit" "$current_commit"; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           echo "changed=true" >> "$GITHUB_OUTPUT"
           echo "tag=$latest_tag" >> "$GITHUB_OUTPUT"
+          echo "commit=$latest_commit" >> "$GITHUB_OUTPUT"
 
       - name: Update submodule
         if: steps.upstream.outputs.changed == 'true'
@@ -61,6 +66,21 @@ jobs:
         if: steps.upstream.outputs.changed == 'true'
         run: |
           release_tag="${{ steps.upstream.outputs.tag }}"
-          git tag -a "$release_tag" -m "Update to lucide $release_tag"
+
+          if git show-ref --verify --quiet "refs/tags/$release_tag"; then
+            tagged_submodule_commit="$(git ls-tree "$release_tag" lucide | awk '{print $3}')"
+            if [ "$tagged_submodule_commit" != "${{ steps.upstream.outputs.commit }}" ]; then
+              echo "Tag $release_tag already exists but points to a different Lucide commit." >&2
+              exit 1
+            fi
+            echo "Tag $release_tag already exists; skipping tag creation."
+            tag_exists=true
+          else
+            git tag -a "$release_tag" -m "Update to lucide $release_tag"
+            tag_exists=false
+          fi
+
           git push origin Moe
-          git push origin "$release_tag"
+          if [ "$tag_exists" = false ]; then
+            git push origin "$release_tag"
+          fi
